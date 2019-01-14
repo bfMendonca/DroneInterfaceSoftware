@@ -2,14 +2,15 @@
 
 #include "messages/hmc5983.pb.h"
 #include "messages/mpu6500.pb.h"
+#include "messages/motorsinterface.pb.h"
 
 IMUHandler::IMUHandler(QObject *parent) : QObject(parent)
   , m_serialPort( )
   , m_inputBuffer( )
+  , m_pwmTimer( this )
 {
     QList< QSerialPortInfo > availableDevices = QSerialPortInfo::availablePorts();
     QSerialPortInfo toOpenPort;
-
 
     m_inputBuffer.reserve( 300 );
 
@@ -33,8 +34,15 @@ IMUHandler::IMUHandler(QObject *parent) : QObject(parent)
         connect( &m_serialPort, &QSerialPort::readyRead, this, &IMUHandler::dataReceived );
     }else {
         m_serialPort.close();
+
         qFatal("Error oppening port.");
     }
+
+
+    m_pwmTimer.setInterval( 2000 );
+    connect( &m_pwmTimer, &QTimer::timeout, this, &IMUHandler::pwmTimerOverflow );
+    m_pwmTimer.start();
+
 
 }
 
@@ -61,6 +69,7 @@ void IMUHandler::dataReceived()
 
         if( endIndex < startIndex ) {
             m_inputBuffer.remove(0, startIndex );
+            qCritical() << "Opa 12321";
             break;
         }
 
@@ -70,7 +79,7 @@ void IMUHandler::dataReceived()
             MPU6500Readings mpu;
             bool statusMpu = mpu.ParseFromArray( m_inputBuffer.constData()+startIndex + 4, ( endIndex - startIndex ) - 4 );
             if( statusMpu ) {
-                qCritical() <<    "accel x: " <<        QString::number(mpu.accelerometer().x(), 'f', 3 )
+                qCritical()    <<    "accel x: " <<        QString::number(mpu.accelerometer().x(), 'f', 3 )
                                << " \taccel y: " <<     QString::number(mpu.accelerometer().y(), 'f', 3 )
                                << " \taccel z: " <<     QString::number(mpu.accelerometer().z(), 'f', 3 )
                                << " \tgyro z: " <<      QString::number(mpu.gyroscope().x(), 'f', 3 )
@@ -78,7 +87,6 @@ void IMUHandler::dataReceived()
                                << " \tgyro z: " <<      QString::number(mpu.gyroscope().z(), 'f', 3 )
                                << " \ttemperature: " << QString::number(mpu.temperature(), 'f', 3 )
                                << " \ttimestamp: " << mpu.timestamp();
-
                 m_inputBuffer.remove( startIndex, ( endIndex - startIndex ) + 5 );
             }else {
                 m_inputBuffer.remove( 0, endIndex + 5 );
@@ -106,4 +114,40 @@ void IMUHandler::dataReceived()
     if( m_inputBuffer.contains( end ) && !m_inputBuffer.contains( start ) ) {
         m_inputBuffer.clear();
     }
+}
+
+void IMUHandler::pwmTimerOverflow()
+{
+    qCritical() << "OI";
+    QByteArray array(50, '\0');
+
+    MotorsInterfaceMessage motorsMessage;
+
+    static uint8_t counter = 0x00;
+
+    if( ++counter == 0x99 ) {
+        counter = 0x00;
+    }
+
+    motorsMessage.set_motor1dc( counter );
+    motorsMessage.set_motor2dc( counter );
+    motorsMessage.set_motor3dc( counter );
+    motorsMessage.set_motor4dc( counter );
+
+    size_t size = motorsMessage.ByteSize();
+    void *buffer = malloc(size);
+    motorsMessage.SerializeToArray(buffer, size);
+    memcpy( array.data()+4, buffer, size );
+
+    array[0] = 0xAA;
+    array[1] = 0xBB;
+    array[2] = 0xCC;
+    array[3] = 0x99;
+
+    array[ static_cast< int> ( 4+size ) ] = '*';
+    array[ static_cast< int> ( 5+size ) ] = 'F';
+    array[ static_cast< int> ( 6+size ) ] = 'I';
+    array[ static_cast< int> ( 7+size ) ] = 'M';
+
+    m_serialPort.write( array );
 }

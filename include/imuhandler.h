@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QSerialPort>
 #include <QSerialPortInfo>
+#include <QTimer>
 
 class IMUHandler : public QObject
 {
@@ -19,11 +20,13 @@ public slots:
 
 private slots:
     void dataReceived();
+    void pwmTimerOverflow();
 
 private:
     QSerialPort m_serialPort;
-
     QByteArray m_inputBuffer;
+
+    QTimer m_pwmTimer;
 };
 
 #endif // IMUHANDLER_H

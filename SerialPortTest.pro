@@ -26,7 +26,9 @@ SOURCES += \
         messages/teste.pb.cc \
         messages/hmc5983.pb.cc \
         messages/mpu6500.pb.cc \
-        messages/vector3.pb.cc
+        messages/vector3.pb.cc \
+        messages/JoystickReadings.pb.cc \
+        messages/motorsinterface.pb.cc
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
@@ -37,5 +39,7 @@ HEADERS += \
     include/imuhandler.h \
     messages/hmc5983.pb.h \
     messages/mpu6500.pb.h \
-    messages/vector3.pb.h
+    messages/vector3.pb.h \
+    messages/JoystickReadings.pb.h \
+    messages/motorsinterface.pb.h
 
