@@ -2,6 +2,7 @@
 
 #include "messages/hmc5983.pb.h"
 #include "messages/mpu6500.pb.h"
+#include "messages/JoystickReadings.pb.h"
 #include "messages/motorsinterface.pb.h"
 
 IMUHandler::IMUHandler(QObject *parent) : QObject(parent)
@@ -16,7 +17,7 @@ IMUHandler::IMUHandler(QObject *parent) : QObject(parent)
 
     qDebug() << "Listing available ports";
     foreach (const QSerialPortInfo & port, availableDevices ) {
-        if( port.portName() == "ttyACM0" ) {
+        if( port.portName() == "ttyUSB0" ) {
             toOpenPort = port;
         }
         qDebug() << port.portName();
@@ -24,7 +25,7 @@ IMUHandler::IMUHandler(QObject *parent) : QObject(parent)
 
     m_serialPort.setPort( toOpenPort );
     m_serialPort.setParity( QSerialPort::NoParity );
-    m_serialPort.setBaudRate( 1000000 );
+    m_serialPort.setBaudRate( 2000000 );
     m_serialPort.setDataBits( QSerialPort::Data8 );
     m_serialPort.setFlowControl( QSerialPort::NoFlowControl );
     m_serialPort.setStopBits( QSerialPort::OneStop );
@@ -79,14 +80,15 @@ void IMUHandler::dataReceived()
             MPU6500Readings mpu;
             bool statusMpu = mpu.ParseFromArray( m_inputBuffer.constData()+startIndex + 4, ( endIndex - startIndex ) - 4 );
             if( statusMpu ) {
-                qCritical()    <<    "accel x: " <<        QString::number(mpu.accelerometer().x(), 'f', 3 )
-                               << " \taccel y: " <<     QString::number(mpu.accelerometer().y(), 'f', 3 )
-                               << " \taccel z: " <<     QString::number(mpu.accelerometer().z(), 'f', 3 )
-                               << " \tgyro z: " <<      QString::number(mpu.gyroscope().x(), 'f', 3 )
-                               << " \tgyro z: " <<      QString::number(mpu.gyroscope().y(), 'f', 3 )
-                               << " \tgyro z: " <<      QString::number(mpu.gyroscope().z(), 'f', 3 )
-                               << " \ttemperature: " << QString::number(mpu.temperature(), 'f', 3 )
-                               << " \ttimestamp: " << mpu.timestamp();
+//                qCritical()    <<    "accel x: " <<        QString::number(mpu.accelerometer().x(), 'f', 3 )
+//                               << " \taccel y: " <<     QString::number(mpu.accelerometer().y(), 'f', 3 )
+//                               << " \taccel z: " <<     QString::number(mpu.accelerometer().z(), 'f', 3 )
+//                               << " \tgyro z: " <<      QString::number(mpu.gyroscope().x(), 'f', 3 )
+//                               << " \tgyro z: " <<      QString::number(mpu.gyroscope().y(), 'f', 3 )
+//                               << " \tgyro z: " <<      QString::number(mpu.gyroscope().z(), 'f', 3 )
+//                               << " \ttemperature: " << QString::number(mpu.temperature(), 'f', 3 )
+//                               << " \ttimestamp: " << mpu.timestamp();
+
                 m_inputBuffer.remove( startIndex, ( endIndex - startIndex ) + 5 );
             }else {
                 m_inputBuffer.remove( 0, endIndex + 5 );
@@ -95,16 +97,33 @@ void IMUHandler::dataReceived()
             HMC5983Readings mag;
             bool statusMag = mag.ParseFromArray( m_inputBuffer.constData()+startIndex + 4, ( endIndex - startIndex ) - 4 );
             if( statusMag ) {
-                qCritical() <<    "mag x: " <<          QString::number(mag.magnetometer().x(), 'f', 3 )
-                               << " \tmag y: " <<       QString::number(mag.magnetometer().y(), 'f', 3 )
-                               << " \tmag z: " <<       QString::number(mag.magnetometer().z(), 'f', 3 )
-                               << " \ttemperature: " << QString::number(mag.temperature(), 'f', 3 )
-                               << " \ttimestamp: " << mag.timestamp();
+//                qCritical() <<    "mag x: " <<          QString::number(mag.magnetometer().x(), 'f', 3 )
+//                               << " \tmag y: " <<       QString::number(mag.magnetometer().y(), 'f', 3 )
+//                               << " \tmag z: " <<       QString::number(mag.magnetometer().z(), 'f', 3 )
+//                               << " \ttemperature: " << QString::number(mag.temperature(), 'f', 3 )
+//                               << " \ttimestamp: " << mag.timestamp();
+
+                m_inputBuffer.remove( startIndex, ( endIndex - startIndex ) + 5  );
+            }else {
+                m_inputBuffer.remove( 0, endIndex + 5 );
+
+            }
+
+        }else if( type == 0x03) {
+            JoystickReadings joystick;
+            bool statusMag = joystick.ParseFromArray( m_inputBuffer.constData()+startIndex + 4, ( endIndex - startIndex ) - 4 );
+            if( statusMag ) {
+                qCritical()    <<    "Channel 1: " <<          QString::number(joystick.channel1reading(), 'f', 3 )
+                               << " \tChannel 2: " <<       QString::number(joystick.channel2reading(), 'f', 3 )
+                               << " \tChannel 3: " <<       QString::number(joystick.channel3reading(), 'f', 3 )
+                               << " \tChannel 4: " <<       QString::number(joystick.channel4reading(), 'f', 3 );
 
                 m_inputBuffer.remove( startIndex, ( endIndex - startIndex ) + 5  );
             }else {
                 m_inputBuffer.remove( 0, endIndex + 5 );
             }
+
+
         }else {
             m_inputBuffer.clear();
             break;
@@ -118,7 +137,6 @@ void IMUHandler::dataReceived()
 
 void IMUHandler::pwmTimerOverflow()
 {
-    qCritical() << "OI";
     QByteArray array(50, '\0');
 
     MotorsInterfaceMessage motorsMessage;
